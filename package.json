@@ -1,0 +1,22 @@
+{
+  "name": "dockerfile-generator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "java": "node bin/java.js",
+    "nodejs": "node bin/nodejs.js",
+    "php": "node bin/php.js",
+    "python": "node bin/python.js",
+    "ruby": "node bin/ruby.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.9.1",
+    "bluebird": "^3.3.4",
+    "cheerio": "^0.20.0",
+    "lodash": "^4.6.1"
+  }
+}
