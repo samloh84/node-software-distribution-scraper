@@ -4,6 +4,7 @@ const _ = require('lodash');
 const retrieveLinks = require('../lib/scrape').retrieveLinks;
 const fs = Promise.promisifyAll(require('fs'));
 const path = require('path');
+const YAML = require('yamljs');
 
 var startingUrls = ['https://cache.ruby-lang.org/pub/ruby/'];
 
@@ -42,12 +43,21 @@ retrieveLinks(startingUrls)
             }
         });
 
+
         return Promise.all([
-            fs.writeFileAsync(path.resolve(process.cwd(), 'output', language, 'links.txt'), links.join('\n')),
-            fs.writeFileAsync(path.resolve(process.cwd(), 'output', language, language + '.txt'), JSON.stringify(releases, null, 4))
+            writeFileAsync( 'links.txt', links.join('\n')),
+            writeFileAsync(language + '.json', JSON.stringify(releases, null, 4)),
+            writeFileAsync(language + '.yml', YAML.stringify(releases, 4))
         ]);
 
     });
 
 
-
+function writeFileAsync(name, content) {
+    var outputLanguagePath = path.resolve(process.cwd(), 'output', language);
+    var outputFilePath = path.resolve(outputLanguagePath, name);
+    return fs.ensureDirAsync(outputLanguagePath)
+        .then(function () {
+            return fs.writeFileAsync(outputFilePath, content);
+        })
+}

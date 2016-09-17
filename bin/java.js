@@ -3,8 +3,9 @@
 const _ = require('lodash');
 const retrieveLinks = require('../lib/scrape').retrieveLinks;
 const retrieveScriptLinks = require('../lib/scrape').retrieveScriptLinks;
-const fs = Promise.promisifyAll(require('fs'));
+const fs = Promise.promisifyAll(require('fs-extra'));
 const path = require('path');
+const YAML = require('yamljs');
 
 var startingUrls =
     [
@@ -19,19 +20,21 @@ retrieveLinks(startingUrls)
     .then(function (links) {
         links.push('http://www.oracle.com/technetwork/java/javase/downloads/jce-7-download-432124.html');
         console.log(links.join('\n'));
-        return fs.writeFileAsync(language + '_initial_links.txt', links.join('\n')).then(function () {
-            return links
-        });
+        return links;
+    })
+    .tap(function (links) {
+        return writeFileAsync('initial_links.txt', links.join('\n'));
+
     })
     .filter(function (link) {
         return /(javase|javasebusiness)\/downloads\/(jce|jdk|jre|jce|java-archive((-downloads)?-javase|-downloads-java-plat))/.test(link);
     })
-    .then(function (links) {
+    .tap(function (links) {
         console.log(links.join('\n'));
-        return fs.writeFileAsync(language + '_filtered_links.txt', links.join('\n')).then(function () {
-            return retrieveScriptLinks(links);
-        });
-
+        return writeFileAsync('filtered_links.txt', links.join('\n'));
+    })
+    .then(function (links) {
+        return retrieveScriptLinks(links);
     })
     .then(function (links) {
         console.log(links.join('\n'));
@@ -91,14 +94,20 @@ retrieveLinks(startingUrls)
 
         });
 
-
         return Promise.all([
-            fs.writeFileAsync(path.resolve(process.cwd(), 'output', language, 'links.txt'), links.join('\n')),
-            fs.writeFileAsync(path.resolve(process.cwd(), 'output', language, 'unmatched_links.txt'), unmatchedLinks.join('\n')),
-            fs.writeFileAsync(path.resolve(process.cwd(), 'output', language, language + '.txt'), JSON.stringify(releases, null, 4))
+            writeFileAsync('links.txt', links.join('\n')),
+            writeFileAsync('unmatched_links.txt', unmatchedLinks.join('\n')),
+            writeFileAsync(language + '.json', JSON.stringify(releases, null, 4)),
+            writeFileAsync(language + '.yml', YAML.stringify(releases, 4))
         ]);
-
     });
 
 
-
+function writeFileAsync(name, content) {
+    var outputLanguagePath = path.resolve(process.cwd(), 'output', language);
+    var outputFilePath = path.resolve(outputLanguagePath, name);
+    return fs.ensureDirAsync(outputLanguagePath)
+        .then(function () {
+            return fs.writeFileAsync(outputFilePath, content);
+        })
+}
