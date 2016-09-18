@@ -2,7 +2,7 @@
 
 const _ = require('lodash');
 const retrieveLinks = require('../lib/scrape').retrieveLinks;
-const fs = Promise.promisifyAll(require('fs'));
+const fs = Promise.promisifyAll(require('fs-extra'));
 const path = require('path');
 const YAML = require('yamljs');
 
