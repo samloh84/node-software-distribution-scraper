@@ -9,14 +9,15 @@ const ScrapeUtil = require('../lib/ScrapeUtil');
 const YAML = require('yamljs');
 
 
-var startingUrls = ['https://www.python.org/ftp/python/'];
+var startingUrls = ['http://jruby.org/download', 'http://jruby.org/files/downloads/index.html'];
 
 var language = _path.basename(__filename, '.js');
+
 
 var promise = ScrapeUtil.crawl({
     links: startingUrls,
     parseCallback: function (link) {
-        return /^https?:\/\/www.python.org\/ftp\/python\/.*\/$/.test(link) && !/docs?\//.test(link);
+        return /^https?:\/\/jruby.org\/files\/downloads\/(.*\/)?index.html$/.test(link) && !/docs?\//.test(link);
     },
     filterCallback: null
 })
@@ -28,14 +29,14 @@ var promise = ScrapeUtil.crawl({
         _.each(links, function (link) {
             var version, system, suffix;
 
-            var versionMatches = /python-(\d+\.\d+\.\d+(?:[^\-]+)?)(?:-(.*))?\.((?:exe|zip|pkg|tar\.xz|tgz)(?:\.asc)?)$/i.exec(link);
+            var versionMatches = /ruby-(\d+\.\d+(?:\.\d+)?(?:[^\-]+)?(?:-(?:.*))?)\.((?:msi|exe|zip|pkg|tar\.xz|tar\.gz|tar\.bz2|tgz)(?:\.asc)?)$/i.exec(link);
             if (versionMatches) {
                 version = versionMatches[1];
                 system = versionMatches[2];
                 suffix = versionMatches[3];
                 if (!system) {
-                    if (suffix === 'exe' || suffix === 'exe.asc') {
-                        system = 'i686';
+                    if (suffix === 'pkg') {
+                        system = 'macosx';
                     } else {
                         system = 'source';
                     }
@@ -44,7 +45,6 @@ var promise = ScrapeUtil.crawl({
                 _.set(releases, [version, system, suffix], link);
             }
         });
-
 
         return Promise.all([
             ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),

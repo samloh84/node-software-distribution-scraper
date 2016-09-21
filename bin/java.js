@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
+
 const _ = require('lodash');
-const retrieveLinks = require('../lib/scrape').retrieveLinks;
-const retrieveScriptLinks = require('../lib/scrape').retrieveScriptLinks;
+const _path = require('path');
+const Promise = require('bluebird');
 const fs = Promise.promisifyAll(require('fs-extra'));
-const path = require('path');
+const ScrapeUtil = require('../lib/ScrapeUtil');
 const YAML = require('yamljs');
 
 var startingUrls =
@@ -13,17 +14,16 @@ var startingUrls =
         'http://www.oracle.com/technetwork/java/javase/downloads/index.html'
     ];
 
-var filename = path.basename(__filename).split('.');
-var language = filename[filename.length - 2];
+var language = _path.basename(__filename, '.js');
 
-retrieveLinks(startingUrls)
+var promise = ScrapeUtil.retrieveLinks(startingUrls)
     .then(function (links) {
         links.push('http://www.oracle.com/technetwork/java/javase/downloads/jce-7-download-432124.html');
         console.log(links.join('\n'));
         return links;
     })
     .tap(function (links) {
-        return writeFileAsync('initial_links.txt', links.join('\n'));
+        return ScrapeUtil.outputLinks(language, 'initial_links.txt', links.join('\n'));
 
     })
     .filter(function (link) {
@@ -31,10 +31,10 @@ retrieveLinks(startingUrls)
     })
     .tap(function (links) {
         console.log(links.join('\n'));
-        return writeFileAsync('filtered_links.txt', links.join('\n'));
+        return ScrapeUtil.outputLinks(language, 'filtered_links.txt', links.join('\n'));
     })
     .then(function (links) {
-        return retrieveScriptLinks(links);
+        return ScrapeUtil.retrieveScriptLinks(links);
     })
     .then(function (links) {
         console.log(links.join('\n'));
@@ -78,6 +78,8 @@ retrieveLinks(startingUrls)
                         product = 'server-jre';
                     }
 
+                    link = link.replace(/\/otn\//, '/otn-pub/');
+
                     _.set(releases, [product, version, system, suffix], link);
 
                     return true;
@@ -94,20 +96,15 @@ retrieveLinks(startingUrls)
 
         });
 
+
         return Promise.all([
-            writeFileAsync('links.txt', links.join('\n')),
-            writeFileAsync('unmatched_links.txt', unmatchedLinks.join('\n')),
-            writeFileAsync(language + '.json', JSON.stringify(releases, null, 4)),
-            writeFileAsync(language + '.yml', YAML.stringify(releases, 4))
+            ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
+            ScrapeUtil.outputLinks(language, 'unmatched_links.txt', unmatchedLinks.join('\n')),
+            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(releases, null, 4)),
+            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(releases, 4))
         ]);
     });
 
 
-function writeFileAsync(name, content) {
-    var outputLanguagePath = path.resolve(process.cwd(), 'output', language);
-    var outputFilePath = path.resolve(outputLanguagePath, name);
-    return fs.ensureDirAsync(outputLanguagePath)
-        .then(function () {
-            return fs.writeFileAsync(outputFilePath, content);
-        })
-}
+return ScrapeUtil.execute(promise);
+
