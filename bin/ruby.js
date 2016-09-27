@@ -13,43 +13,78 @@ var startingUrls = ['https://cache.ruby-lang.org/pub/ruby/'];
 
 var language = _path.basename(__filename, '.js');
 
+//https://cache.ruby-lang.org/pub/ruby/1.8/ruby-1.8.7-p302.tar.gz
+
+var filePattern = /^https?:\/\/cache.ruby-lang.org\/pub\/ruby\/\d+\.\d+[a-zA-Z0-9]*\/ruby-(\d+(?:\.\d+)?\.\d+[a-zA-Z0-9]*(?:[-_][a-zA-Z0-9]+)?)(?:\.(zip|tar\.bz2|tar\.xz|tar\.gz|tar\.zip))$/;
+//var shasumsPattern = /^https?:\/\/nodejs.org\/dist\/(v\d+\.\d+\.\d+)\/SHASUMS(?:256|-win)?(?:\.(txt|txt\.asc|txt\.gpg))$/;
+
+
+var filePatternCallback = function (matches) {
+    var version = matches[1];
+    var distribution = 'source';
+    var extension = matches[2];
+
+
+    return {version: version, distribution: distribution, extension: extension};
+};
+
+var patterns = [
+    [filePattern, filePatternCallback]
+];
 
 var promise = ScrapeUtil.crawl({
     links: startingUrls,
     parseCallback: function (link) {
-        return /^https?:\/\/cache.ruby-lang.org\/pub\/ruby\/.*\/$/.test(link) && !/docs?\//.test(link);
+        return /^https?:\/\/cache\.ruby-lang\.org\/pub\/ruby\/.*\/$/.test(link) && !/docs?\//.test(link);
     },
     filterCallback: null
 })
     .then(function (links) {
-        console.log(links.join('\n'));
-
-        var releases = {};
+        var urls = {};
+        var unmatchedLinks = [];
 
         _.each(links, function (link) {
-            var version, system, suffix;
+            var unmatched = true;
 
-            var versionMatches = /ruby-(\d+\.\d+(?:\.\d+)?(?:[^\-]+)?(?:-(?:.*))?)\.((?:msi|exe|zip|pkg|tar\.xz|tar\.gz|tar\.bz2|tgz)(?:\.asc)?)$/i.exec(link);
-            if (versionMatches) {
-                version = versionMatches[1];
-                system = versionMatches[2];
-                suffix = versionMatches[3];
-                if (!system) {
-                    if (suffix === 'pkg') {
-                        system = 'macosx';
-                    } else {
-                        system = 'source';
-                    }
+            _.each(patterns, function (pattern) {
 
+                var matches = pattern[0].exec(link);
+
+                if (_.isNil(matches)) {
+                    return true;
                 }
-                _.set(releases, [version, system, suffix], link);
+
+                unmatched = false;
+
+                var linkInfo = pattern[1](matches);
+
+                var version = linkInfo.version;
+                var distribution = linkInfo.distribution;
+                var extension = linkInfo.extension;
+
+                if (_.isEmpty(distribution)) {
+                    if (extension === 'dmg') {
+                        distribution = 'macosx';
+                    } else if (extension === 'msi') {
+                        distribution = 'x86';
+                    } else {
+                        distribution = 'source';
+                    }
+                }
+                _.set(urls, [version, distribution, extension], link);
+            });
+
+            if (unmatched) {
+                unmatchedLinks.push(link);
             }
         });
 
+
         return Promise.all([
             ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
-            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(releases, null, 4)),
-            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(releases, 4))
+            ScrapeUtil.outputLinks(language, 'unmatched_links.txt', unmatchedLinks.join('\n')),
+            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(urls, null, 4)),
+            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(urls, 4))
         ]);
     });
 

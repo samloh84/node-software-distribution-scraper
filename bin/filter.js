@@ -1,4 +1,3 @@
-
 const _ = require('lodash');
 const _path = require('path');
 const Promise = require('bluebird');

@@ -7,51 +7,109 @@ const Promise = require('bluebird');
 const fs = Promise.promisifyAll(require('fs-extra'));
 const ScrapeUtil = require('../lib/ScrapeUtil');
 const YAML = require('yamljs');
+const sprintf = require('sprintf-js').sprintf;
 
 
-var startingUrls = ['http://php.net/releases/', 'http://php.net/downloads.php'];
+var startingUrls = ['http://php.net/releases/', 'http://php.net/downloads.php', 'https://downloads.php.net/~davey/', 'http://museum.php.net/'];
 
 var language = _path.basename(__filename, '.js');
 
-var promise = ScrapeUtil.retrieveLinks(startingUrls)
+var filePattern1 = /^https?:\/\/php\.net\/get\/php-(\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(tar\.bz2|tar\.gz|tar\.xz))\/from\/this\/mirror/;
+
+
+var filePattern1Callback = function (matches) {
+    var version = matches[1];
+    //var distribution = matches[2];
+    var extension = matches[2];
+
+    return {version: version, distribution: distribution, extension: extension};
+};
+
+var filePattern2 = /^https?:\/\/museum\.php\.net\/(?:php\d+|win32)\/php-(\d+(?:\.\d+)?\.\d+[a-zA-Z0-9]*)(?:-([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*))?(?:\.(tar\.bz2|tar\.gz|tar\.xz|zip|exe|msi))/;
+
+var filePattern2Callback = function (matches) {
+    var version = matches[1];
+    var distribution = matches[2];
+    var extension = matches[3];
+
+    if (_.isEmpty(distribution)) {
+        distribution = 'source';
+    }
+
+    return {version: version, distribution: distribution, extension: extension};
+};
+
+var filePattern3 = /^https?:\/\/downloads.php.net\/~davey\/php-(\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(tar\.bz2|tar\.gz|tar\.xz))/;
+
+var filePattern3Callback = function (matches) {
+    var version = matches[1];
+    var distribution = matches[2];
+    var extension = matches[3];
+
+    if (_.isEmpty(distribution)) {
+        distribution = 'source';
+    }
+
+    return {version: version, distribution: distribution, extension: extension};
+};
+
+//var shasumsPattern = /^https?:\/\/nodejs.org\/dist\/v(\d+\.\d+\.\d+)\/SHASUMS(?:256|-win)?(?:\.(txt|txt\.asc|txt\.gpg))$/;
+
+
+var patterns = [
+    [filePattern1, filePattern1Callback],
+    [filePattern2, filePattern2Callback],
+    [filePattern3, filePattern3Callback]
+];
+
+var promise = ScrapeUtil.crawl({
+    links: startingUrls,
+    parseCallback: function (link) {
+        return /^https?:\/\/museum.php.net\/.*\/$/.test(link) && !/docs?\//.test(link);
+    },
+    filterCallback: null
+})
     .then(function (links) {
-        links = _.map(links, function (link) {
-            return link.replace(/\/a\/mirror/, '/this/mirror');
-        });
-
-        console.log(links.join('\n'));
-
-        var releases = {};
+        var urls = {};
+        var unmatchedLinks = [];
 
         _.each(links, function (link) {
-            var version, system, suffix;
+            var unmatched = true;
 
-            var versionMatches = /php-(\d+\.\d+\.\d+)(?:-(.+?))?\.((?:zip|exe|tar\.gz|tar\.xz|tar\.bz2)(?:\.asc)?)/i.exec(link);
-            if (versionMatches) {
-                version = versionMatches[1];
-                system = versionMatches[2];
-                suffix = versionMatches[3];
-                if (!system) {
-                    if (suffix === 'pkg') {
-                        system = 'macosx';
-                    } else {
-                        system = 'source';
-                    }
+            _.each(patterns, function (pattern) {
 
+                var matches = pattern[0].exec(link);
+
+                if (_.isNil(matches)) {
+                    return true;
                 }
 
-                _.set(releases, [version, system, suffix], link);
+                unmatched = false;
+
+                var linkInfo = pattern[1](matches);
+
+                var version = linkInfo.version;
+                var distribution = linkInfo.distribution;
+                var extension = linkInfo.extension;
+
+                if (_.isEmpty(distribution)) {
+                    distribution = 'source';
+                }
+                _.set(urls, [version, distribution, extension], link);
+            });
+
+            if (unmatched) {
+                unmatchedLinks.push(link);
             }
         });
 
 
         return Promise.all([
             ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
-            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(releases, null, 4)),
-            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(releases, 4))
+            ScrapeUtil.outputLinks(language, 'unmatched_links.txt', unmatchedLinks.join('\n')),
+            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(urls, null, 4)),
+            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(urls, 4))
         ]);
-
     });
-
 
 return ScrapeUtil.execute(promise);
