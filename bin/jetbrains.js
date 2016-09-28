@@ -55,7 +55,7 @@ var promise = ScrapeUtil.retrieveLinks(startingUrls)
         return Promise.all([
             ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
             ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(releases, null, 4)),
-            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(releases, 4))
+            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(releases, 12))
         ]);
 
 

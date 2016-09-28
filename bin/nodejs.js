@@ -87,7 +87,7 @@ var promise = ScrapeUtil.crawl({
             ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
             ScrapeUtil.outputLinks(language, 'unmatched_links.txt', unmatchedLinks.join('\n')),
             ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(urls, null, 4)),
-            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(urls, 4))
+            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(urls, 12))
         ]);
     });
 

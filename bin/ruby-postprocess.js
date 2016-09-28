@@ -99,7 +99,7 @@ var promise = ScrapeUtil.retrieve({
     .then(function () {
         return Promise.all([
             ScrapeUtil.outputLinks(language, sprintf('%s-vars.json', language), JSON.stringify(output, null, 4)),
-            ScrapeUtil.outputLinks(language, sprintf('%s-vars.yml', language), YAML.stringify(output, 4))
+            ScrapeUtil.outputLinks(language, sprintf('%s-vars.yml', language), YAML.stringify(output, 12))
         ]);
     });
 
