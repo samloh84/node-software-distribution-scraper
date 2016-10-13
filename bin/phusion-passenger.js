@@ -5,33 +5,33 @@ const _ = require('lodash');
 const sprintf = require('sprintf-js').sprintf;
 const YAML = require('yamljs');
 const Promise = require('bluebird');
+
 var language = _path.basename(__filename, '.js');
 var workingDirectory = _path.resolve(process.cwd(), 'output', language);
 
-var startingUrls = ['http://jruby.org/download', 'http://jruby.org/files/downloads/index.html'];
-var parseCallback = function (link) {
-    return /^https?:\/\/jruby.org\/files\/downloads\/(.*\/)?index.html$/.test(link) && !/docs?\//.test(link);
-};
+var startingUrls = ['https://www.phusionpassenger.com/file_releases'];
 
-//https://s3.amazonaws.com/jruby.org/downloads/1.1.6RC1/jruby-src-1.1.6RC1.tar.gz
-var filePattern = /^https?:\/\/s3.amazonaws.com\/jruby.org\/downloads\/\d+\.\d+\.\d+[a-zA-Z0-9]*\/jruby-(src|bin)-(\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(tar\.gz|zip))$/;
-
+var filePattern = /^https?:\/\/phusion-passenger\.s3\.amazonaws\.com\/releases\/passenger-(\d+\.\d+\.\d+[\.-_a-zA-Z0-9]*)(?:\.(tar\.gz|gem))$/;
 var filePatternCallback = function (matches) {
-    var distribution = matches[1];
-    var version = matches[2];
-    var extension = matches[3];
+    var version = matches[1];
+    var extension = matches[2];
+    var distribution;
+
+    if (extension === 'gem') {
+        distribution = 'binaries';
+    } else if (extension === 'tar.gz') {
+        distribution = 'source';
+    }
 
     return {version: version, distribution: distribution, extension: extension};
 };
+
 var patterns = [
     {pattern: filePattern, callback: filePatternCallback}
 ];
 
-
-var promise = ScrapeUtil.crawl({
-    url: startingUrls,
-    parseCallback: parseCallback,
-    filterCallback: null
+var promise = ScrapeUtil.retrieveLinks({
+    url: startingUrls
 })
     .then(function (links) {
         var urls = {};
@@ -56,6 +56,9 @@ var promise = ScrapeUtil.crawl({
                 var distribution = linkInfo.distribution;
                 var extension = linkInfo.extension;
 
+                if (_.isEmpty(distribution)) {
+                    distribution = 'source';
+                }
 
                 _.set(urls, [version, distribution, extension], link);
             });

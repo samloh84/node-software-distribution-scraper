@@ -1,18 +1,20 @@
-#!/usr/bin/env node
-
-const _ = require('lodash');
-const _path = require('path');
-const Promise = require('bluebird');
-const fs = Promise.promisifyAll(require('fs-extra'));
+const CliUtil = require('../lib/CliUtil');
 const ScrapeUtil = require('../lib/ScrapeUtil');
-const YAML = require('yamljs');
+const _path = require('path');
+const _ = require('lodash');
 const sprintf = require('sprintf-js').sprintf;
+const YAML = require('yamljs');
+const Promise = require('bluebird');
+
 
 var startingUrls = ['http://www.oracle.com/technetwork/java/javase/archive-139210.html',
     'http://www.oracle.com/technetwork/java/javase/downloads/index.html',
     'http://www.oracle.com/technetwork/java/javase/downloads/jce-7-download-432124.html'];
 
+
 var language = _path.basename(__filename, '.js');
+
+var workingDirectory = _path.resolve(process.cwd(), 'output', language);
 
 
 var filePattern1 = /https?:\/\/download\.oracle\.com\/otn(?:-pub)?\/java\/(?:[^\/]+)\/([^\/]+)\/([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)-(?:\d+(?:_\d+)*|\d+u\d+)-([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)(?:\.(rpm|tar\.Z|zip|tar\.gz|exe|dmg|bin|sh))/;
@@ -39,30 +41,34 @@ var filePattern2Callback = function (matches) {
 
 
 var patterns = [
-    [filePattern1, filePattern1Callback],
-    [filePattern2, filePattern2Callback]
+    {pattern: filePattern1, callback: filePattern1Callback},
+    {pattern: filePattern2, callback: filePattern2Callback}
 ];
 
 var promise = ScrapeUtil.crawl({
-    links: startingUrls,
+    url: startingUrls,
     parseCallback: function (link) {
         return /^https?:\/\/www\.oracle\.com\/technetwork\/java\/(?:javase|javasebusiness|javaee)?\/downloads\//.test(link);
     },
     filterCallback: null
 })
     .then(function (links) {
+        links = _.map(links, function (link) {
+            return link.replace('/otn/', '/otn-pub/');
+        });
+
         var urls = {};
         var unmatchedLinks = [];
 
         _.each(links, function (link) {
 
-            link = link.replace(/\/otn\//, '/otn-pub/');
+            //link = link.replace(/\/otn\//, '/otn-pub/');
 
             var unmatched = true;
 
             _.each(patterns, function (pattern) {
 
-                var matches = pattern[0].exec(link);
+                var matches = pattern.pattern.exec(link);
 
                 if (_.isNil(matches)) {
                     return true;
@@ -70,7 +76,7 @@ var promise = ScrapeUtil.crawl({
 
                 unmatched = false;
 
-                var linkInfo = pattern[1](matches);
+                var linkInfo = pattern.callback(matches);
 
                 var product = linkInfo.product;
                 var version = linkInfo.version;
@@ -103,11 +109,22 @@ var promise = ScrapeUtil.crawl({
 
 
         return Promise.all([
-            ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
-            ScrapeUtil.outputLinks(language, 'unmatched_links.txt', unmatchedLinks.join('\n')),
-            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(urls, null, 4)),
-            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(urls, 12))
+            ScrapeUtil.writeFile({path: _path.resolve(workingDirectory, 'links.txt'), data: links.join('\n')}),
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDirectory, 'unmatched_links.txt'),
+                data: unmatchedLinks.join('\n')
+            }),
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDirectory, sprintf('%s.json', language)),
+                data: JSON.stringify(urls, null, 4)
+            }),
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDirectory, sprintf('%s.yml', language)),
+                data: YAML.stringify(urls, 12)
+            })
         ]);
     });
 
-return ScrapeUtil.execute(promise);
+
+CliUtil.execute(promise);
+

@@ -1,22 +1,20 @@
-#!/usr/bin/env node
-
-
-const _ = require('lodash');
-const _path = require('path');
-const Promise = require('bluebird');
-const fs = Promise.promisifyAll(require('fs-extra'));
+const CliUtil = require('../lib/CliUtil');
 const ScrapeUtil = require('../lib/ScrapeUtil');
-const YAML = require('yamljs');
+const _path = require('path');
+const _ = require('lodash');
 const sprintf = require('sprintf-js').sprintf;
+const YAML = require('yamljs');
+const Promise = require('bluebird');
+var language = _path.basename(__filename, '.js');
+var workingDirectory = _path.resolve(process.cwd(), 'output', language);
 
 var startingUrls = ['https://nodejs.org/dist/'];
-
-var language = _path.basename(__filename, '.js');
-
+var parseCallback = function (link) {
+    return /^https?:\/\/nodejs.org\/dist\/.*\/$/.test(link) && !/docs?\//.test(link);
+};
 
 var filePattern = /^https?:\/\/nodejs.org\/dist\/v(\d+\.\d+\.\d+)\/node-v\d+\.\d+\.\d+(?:-([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*))?(?:\.(7z|msi|pkg|tar\.gz|tar\.xz|zip))$/;
 var shasumsPattern = /^https?:\/\/nodejs.org\/dist\/v(\d+\.\d+\.\d+)\/SHASUMS(?:256|-win)?(?:\.(txt|txt\.asc|txt\.gpg))$/;
-
 
 var filePatternCallback = function (matches) {
     var version = matches[1];
@@ -33,15 +31,14 @@ var shasumsPatternCallback = function (matches) {
     return {version: version, distribution: distribution, extension: extension};
 };
 var patterns = [
-    [filePattern, filePatternCallback],
-    [shasumsPattern, shasumsPatternCallback]
+    {pattern: filePattern, callback: filePatternCallback},
+    {pattern: shasumsPattern, callback: shasumsPatternCallback}
 ];
 
+
 var promise = ScrapeUtil.crawl({
-    links: startingUrls,
-    parseCallback: function (link) {
-        return /^https?:\/\/nodejs.org\/dist\/.*\/$/.test(link) && !/docs?\//.test(link);
-    },
+    url: startingUrls,
+    parseCallback: parseCallback,
     filterCallback: null
 })
     .then(function (links) {
@@ -53,7 +50,7 @@ var promise = ScrapeUtil.crawl({
 
             _.each(patterns, function (pattern) {
 
-                var matches = pattern[0].exec(link);
+                var matches = pattern.pattern.exec(link);
 
                 if (_.isNil(matches)) {
                     return true;
@@ -61,7 +58,7 @@ var promise = ScrapeUtil.crawl({
 
                 unmatched = false;
 
-                var linkInfo = pattern[1](matches);
+                var linkInfo = pattern.callback(matches);
 
                 var version = linkInfo.version;
                 var distribution = linkInfo.distribution;
@@ -84,11 +81,22 @@ var promise = ScrapeUtil.crawl({
 
 
         return Promise.all([
-            ScrapeUtil.outputLinks(language, 'links.txt', links.join('\n')),
-            ScrapeUtil.outputLinks(language, 'unmatched_links.txt', unmatchedLinks.join('\n')),
-            ScrapeUtil.outputLinks(language, language + '.json', JSON.stringify(urls, null, 4)),
-            ScrapeUtil.outputLinks(language, language + '.yml', YAML.stringify(urls, 12))
+            ScrapeUtil.writeFile({path: _path.resolve(workingDirectory, 'links.txt'), data: links.join('\n')}),
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDirectory, 'unmatched_links.txt'),
+                data: unmatchedLinks.join('\n')
+            }),
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDirectory, sprintf('%s.json', language)),
+                data: JSON.stringify(urls, null, 4)
+            }),
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDirectory, sprintf('%s.yml', language)),
+                data: YAML.stringify(urls, 12)
+            })
         ]);
     });
 
-return ScrapeUtil.execute(promise);
+
+CliUtil.execute(promise);
+

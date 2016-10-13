@@ -4,29 +4,27 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "java": "node bin/java.js",
-    "nodejs": "node bin/nodejs.js",
-    "php": "node bin/php.js",
-    "python": "node bin/python.js",
-    "ruby": "node bin/ruby.js",
-    "iojs": "node bin/iojs.js",
-    "jruby": "node bin/jruby.js",
-    "jetbrains": "node bin/jetbrains.js",
-    "filter": "node bin/filter.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@lohsy84/common-utils": "0.0.6",
+    "@lohsy84/request-util": "0.0.8",
     "adm-zip": "^0.4.7",
     "axios": "^0.14.0",
     "bluebird": "^3.4.6",
-    "cheerio": "^0.20.0",
-    "fs-extra": "^0.30.0",
-    "lodash": "^4.15.0",
-    "moment": "^2.15.0",
+    "cheerio": "^0.22.0",
+    "lodash": "^4.16.2",
+    "moment": "^2.15.1",
+    "node-stream-zip": "^1.3.4",
+    "request": "^2.75.0",
     "sprintf-js": "^1.0.3",
     "tar.gz": "^1.0.5",
     "yamljs": "^0.2.8"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.1.0"
   }
 }

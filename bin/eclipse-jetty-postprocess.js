@@ -8,13 +8,16 @@ const sprintf = require('sprintf-js').sprintf;
 const YAML = require('yamljs');
 const Promise = require('bluebird');
 
+
 var language = /(\w+)-postprocess/.exec(_path.basename(__filename, '.js'))[1];
 var workingDir = _path.resolve(process.cwd(), 'output', language);
 var urls = require(_path.resolve(workingDir, sprintf('%s.json', language)));
 
+
 var output = {urls: {}};
 
-var versions = ['7.1.0RC3', '7.0.11', '5.6.26'];
+var versions = ['9.3.12.v20160915','9.3.11.v20160721','9.2.19.v20160908','8.1.21.v20160908','7.6.21.v20160908'];
+
 
 var availableVersions = _.keys(urls);
 versions = _.intersection(versions, availableVersions);
@@ -27,9 +30,9 @@ var promise = Promise.each(versions, function (version) {
 
     var versionUrls = _.get(urls, version);
 
-    var sourceUrl = _.get(versionUrls, ['source', 'tar.gz']);
+    var binariesUrl = _.get(versionUrls, ['binaries', 'zip']);
     return Promise.all([
-        processUrl({url: sourceUrl, version: version, distribution: 'source'})
+        processUrl({url: binariesUrl, version: version, distribution: 'binaries'})
     ])
 })
     .then(function () {
@@ -54,29 +57,10 @@ function processUrl(options) {
     var version = _.get(options, 'version');
 
 
-    var pathname = _.get(_url.parse(url), 'pathname');
-    pathname = pathname.replace(/\/from\/(?:a|this)\/mirror$/, '');
-    var fileName = _path.basename(pathname);
+    var fileName = _path.basename(_.get(_url.parse(url), 'pathname'));
     var filePath = _path.resolve(workingDir, 'downloads', version, fileName);
 
-
-    function retrieve(url) {
-        return ScrapeUtil.retrieve({
-            url: url,
-            method: 'head'
-        })
-            .then(function (response) {
-                if (response.status === 301 || response.status === 302) {
-                    return retrieve(response.headers.location);
-                }
-                return ScrapeUtil.download({
-                    savePath: filePath,
-                    url: url
-                });
-            })
-    }
-
-    return retrieve(url)
+    return ScrapeUtil.download({savePath: filePath, url: url})
         .then(function () {
             var dirPromise = null;
 

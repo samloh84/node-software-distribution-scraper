@@ -8,28 +8,38 @@ const sprintf = require('sprintf-js').sprintf;
 const YAML = require('yamljs');
 const Promise = require('bluebird');
 
+
 var language = /(\w+)-postprocess/.exec(_path.basename(__filename, '.js'))[1];
 var workingDir = _path.resolve(process.cwd(), 'output', language);
 var urls = require(_path.resolve(workingDir, sprintf('%s.json', language)));
 
+
 var output = {urls: {}};
 
-var versions = ['7.1.0RC3', '7.0.11', '5.6.26'];
+var products = ["CLion", "datagrip", "ideaIU", "pycharm-professional", "RubyMine", "PhpStorm", "WebStorm"];
 
-var availableVersions = _.keys(urls);
-versions = _.intersection(versions, availableVersions);
 
-var promise = Promise.each(versions, function (version) {
+var availableProducts = _.keys(urls);
+products = _.intersection(products, availableProducts);
 
-    if (versions.indexOf(version) === -1) {
+var promise = Promise.each(products, function (product) {
+
+    if (products.indexOf(product) === -1) {
         return;
     }
 
-    var versionUrls = _.get(urls, version);
+    var productUrls = _.get(urls, product);
+    var version = _.first(_.keys(productUrls));
 
-    var sourceUrl = _.get(versionUrls, ['source', 'tar.gz']);
+    var binariesUrl = _.get(productUrls, [version, 'tar.gz']);
+
     return Promise.all([
-        processUrl({url: sourceUrl, version: version, distribution: 'source'})
+        processUrl({
+            url: binariesUrl,
+            product: product,
+            version: version,
+            distribution: 'binaries'
+        })
     ])
 })
     .then(function () {
@@ -50,30 +60,34 @@ return CliUtil.execute(promise);
 
 function processUrl(options) {
     var url = _.get(options, 'url');
-    var distribution = _.get(options, 'distribution');
+    var product = _.get(options, 'product');
     var version = _.get(options, 'version');
+    var distribution = _.get(options, 'distribution');
+    var additionalAttributes = _.get(options, 'attributes', {});
 
 
-    var pathname = _.get(_url.parse(url), 'pathname');
-    pathname = pathname.replace(/\/from\/(?:a|this)\/mirror$/, '');
-    var fileName = _path.basename(pathname);
-    var filePath = _path.resolve(workingDir, 'downloads', version, fileName);
+    var fileName = _path.basename(_.get(_url.parse(url), 'pathname'));
+    var filePath = _path.resolve(workingDir, 'downloads', product, version, fileName);
 
 
     function retrieve(url) {
         return ScrapeUtil.retrieve({
             url: url,
             method: 'head'
+
         })
             .then(function (response) {
-                if (response.status === 301 || response.status === 302) {
+                if (response.status === 302) {
                     return retrieve(response.headers.location);
                 }
                 return ScrapeUtil.download({
                     savePath: filePath,
                     url: url
+
                 });
-            })
+            });
+
+
     }
 
     return retrieve(url)
@@ -83,17 +97,21 @@ function processUrl(options) {
             if (/(\.tar\.gz|\.tgz)$/.test(fileName)) {
                 dirPromise = ScrapeUtil.listTarballEntries(filePath)
                     .then(function (entries) {
-                        return _.get(_.first(entries), 'path');
+                        var entry = _.first(entries);
+                        return _.get(entry, 'path');
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error(err.stack || err);
                         return null;
                     });
             } else if (/\.zip$/.test(fileName)) {
                 dirPromise = ScrapeUtil.listZipEntries(filePath)
                     .then(function (entries) {
-                        return _.get(_.first(entries), 'entryName');
+                        var entry = _.first(_.values(entries));
+                        return _.get(entry, 'name');
                     })
                     .catch(function () {
+                        console.error(err.stack || err);
                         return null;
                     });
             }
@@ -113,6 +131,11 @@ function processUrl(options) {
                 hash = props.hash.toUpperCase()
             }
 
-            _.set(output, ['urls', version, distribution], {file: fileName, dir: dir, url: url, hash: hash});
+            _.set(output, ['urls', product, version, distribution], _.merge({}, additionalAttributes, {
+                file: fileName,
+                dir: dir,
+                url: url,
+                hash: hash
+            }));
         });
 }

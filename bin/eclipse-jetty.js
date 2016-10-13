@@ -4,29 +4,40 @@ const _path = require('path');
 const _ = require('lodash');
 const sprintf = require('sprintf-js').sprintf;
 const YAML = require('yamljs');
-const Promise = require('bluebird');
+
+
 var language = _path.basename(__filename, '.js');
+
 var workingDirectory = _path.resolve(process.cwd(), 'output', language);
 
-var startingUrls = ['http://jruby.org/download', 'http://jruby.org/files/downloads/index.html'];
+var startingUrls = ['http://www.eclipse.org/jetty/download.html'];
+
 var parseCallback = function (link) {
-    return /^https?:\/\/jruby.org\/files\/downloads\/(.*\/)?index.html$/.test(link) && !/docs?\//.test(link);
+    return /^https?:\/\/download\.eclipse\.org\/jetty\/updates\/jetty-bundles-\d+\.x$/.test(link);
 };
 
-//https://s3.amazonaws.com/jruby.org/downloads/1.1.6RC1/jruby-src-1.1.6RC1.tar.gz
-var filePattern = /^https?:\/\/s3.amazonaws.com\/jruby.org\/downloads\/\d+\.\d+\.\d+[a-zA-Z0-9]*\/jruby-(src|bin)-(\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(tar\.gz|zip))$/;
+var filePattern = /^https?:\/\/repo1\.maven\.org\/maven2\/org\/eclipse\/jetty\/jetty-distribution\/(\d+\.\d+\.\d+\.v\d+)\/jetty-distribution-\d+\.\d+\.\d+\.v\d+(?:\.(tar\.gz|zip))$/;
+//var shasumsPattern = /^https?:\/\/nodejs.org\/dist\/v(\d+\.\d+\.\d+)\/SHASUMS(?:256|-win)?(?:\.(txt|txt\.asc|txt\.gpg))$/;
+
 
 var filePatternCallback = function (matches) {
-    var distribution = matches[1];
-    var version = matches[2];
-    var extension = matches[3];
+    var version = matches[1];
+    var distribution = 'binaries';
+    var extension = matches[2];
 
     return {version: version, distribution: distribution, extension: extension};
 };
+// var shasumsPatternCallback = function (matches) {
+//     var version = matches[1];
+//     var distribution = 'shasum';
+//     var extension = matches[2];
+//
+//     return {version: version, distribution: distribution, extension: extension};
+// };
 var patterns = [
-    {pattern: filePattern, callback: filePatternCallback}
+    {pattern: filePattern, callback: filePatternCallback},
+    // {pattern: shasumsPattern, callback: shasumsPatternCallback}
 ];
-
 
 var promise = ScrapeUtil.crawl({
     url: startingUrls,
@@ -55,7 +66,6 @@ var promise = ScrapeUtil.crawl({
                 var version = linkInfo.version;
                 var distribution = linkInfo.distribution;
                 var extension = linkInfo.extension;
-
 
                 _.set(urls, [version, distribution, extension], link);
             });
