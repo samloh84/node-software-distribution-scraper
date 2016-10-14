@@ -1,0 +1,51 @@
+FROM {{ from }}
+MAINTAINER {{ maintainer | safe }}
+
+# Reference
+# https://www.digitalocean.com/community/tutorials/how-to-install-ruby-on-rails-with-rbenv-on-centos-7
+
+# Install compiler and library dependencies
+RUN yum install -y \
+git-core \
+zlib-devel \
+gcc-c++ \
+patch \
+readline-devel \
+libyaml-devel \
+libffi-devel \
+openssl-devel \
+make \
+# bzip2 \
+# autoconf \
+# automake \
+# libtool \
+# bison \
+# curl \
+sqlite-devel
+
+RUN \
+
+# Create temp directory
+mkdir -p /tmp/ruby/{{ source.dir }} \
+&& pushd /tmp/ruby/{{ source.dir }} \
+
+# Download and verify Ruby source code
+&& curl -Lo {{ source.file }} {{ source.url }} \
+&& echo "{{ source.hash }}  {{ source.file }}" | sha256sum -c - \
+
+# Extract and compile source
+&& mkdir -p /opt/ruby/{{ source.dir }} \
+&& tar -xzf {{ source.file }} -C /tmp/ruby/{{ source.dir }} \
+&& pushd /tmp/ruby/{{ source.dir }}/{{ source.dir }} \
+&& ./configure --prefix /opt/ruby/{{ source.dir }} \
+&& make \
+&& make install \
+&& popd \
+&& popd \
+&& rm -rf /tmp/ruby
+
+# Set Path environment variable
+ENV PATH $PATH:/opt/ruby/{{ source.dir }}/bin
+
+# Upgrade gem to latest version
+RUN gem update --system
