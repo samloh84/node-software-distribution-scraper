@@ -22,7 +22,7 @@ var versions = ['6.7.0', '5.12.0', '4.6.0', '0.12.16', '0.10.47'];
 var availableVersions = _.keys(urls);
 versions = _.intersection(versions, availableVersions);
 
-var promise = Promise.each(versions, function (version) {
+var promise = Promise.map(versions, function (version) {
 
     if (versions.indexOf(version) === -1) {
         return;
@@ -39,7 +39,7 @@ var promise = Promise.each(versions, function (version) {
         processUrl({url: binariesUrl, version: version, distribution: 'binaries'}),
         processUrl({url: shasumUrl, version: version, distribution: 'checksum'}),
         processUrl({url: signatureUrl, version: version, distribution: 'signature'})
-    ])
+    ]);
 })
     .then(function () {
         return Promise.all([

@@ -22,7 +22,7 @@ var products = ["CLion", "datagrip", "ideaIU", "pycharm-professional", "RubyMine
 var availableProducts = _.keys(urls);
 products = _.intersection(products, availableProducts);
 
-var promise = Promise.each(products, function (product) {
+var promise = Promise.map(products, function (product) {
 
     if (products.indexOf(product) === -1) {
         return;

@@ -22,7 +22,7 @@ var versions = ['8u102-b14', '8u101-b13', '7u80-b15', '7u79-b15', '6u45-b06'];
 var availableVersions = _.keys(urls.jdk);
 versions = _.intersection(versions, availableVersions);
 
-var promise = Promise.each(versions, function (version) {
+var promise = Promise.map(versions, function (version) {
 
     if (versions.indexOf(version) === -1) {
         return;

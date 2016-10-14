@@ -5,14 +5,11 @@ Languages:
 * Python
 * Ruby
 
-
-
 IDEs
 * Jetbrains
 
-
-
 TODO:
+* Eclipse
 * Jenkins
 * Gitlab
 * Nginx

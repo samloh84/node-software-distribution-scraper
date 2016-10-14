@@ -1,0 +1,29 @@
+.PHONY: all build clean tag push {{ versions | join(" ") }}
+
+default: all
+
+{% for version in versions %}
+{{ version }}:
+	$(MAKE) -C {{ version }}
+{% endfor %}
+
+build: {{ versions | join(" ") }}
+
+all: {{ versions | join(" ")}}
+
+
+clean:
+{%- for version in versions %}
+	$(MAKE) -C {{ version }} clean
+{%- endfor %}
+
+tag:
+{%- for version in versions %}
+	$(MAKE) -C {{ version }} tag
+{%- endfor %}
+
+push:
+{%- for version in versions %}
+	$(MAKE) -C {{ version }} push
+{%- endfor %}
+

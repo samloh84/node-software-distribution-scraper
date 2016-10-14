@@ -22,7 +22,7 @@ var versions = ['9.3.12.v20160915','9.3.11.v20160721','9.2.19.v20160908','8.1.21
 var availableVersions = _.keys(urls);
 versions = _.intersection(versions, availableVersions);
 
-var promise = Promise.each(versions, function (version) {
+var promise = Promise.map(versions, function (version) {
 
     if (versions.indexOf(version) === -1) {
         return;

@@ -19,7 +19,7 @@ var versions = ['2.7.12', '3.3.6', '3.4.5', '3.5.2', '3.6.0b1', '3.6.0a4'];
 var availableVersions = _.keys(urls);
 versions = _.intersection(versions, availableVersions);
 
-var promise = Promise.each(versions, function (version) {
+var promise = Promise.map(versions, function (version) {
 
     if (versions.indexOf(version) === -1) {
         return;
@@ -28,14 +28,8 @@ var promise = Promise.each(versions, function (version) {
     var versionUrls = _.get(urls, version);
 
     var sourceUrl = _.get(versionUrls, ['source', 'tgz']);
-    // var binariesUrl = _.get(versionUrls, ['linux-x64', 'tar.gz']);
-    //var shasumUrl = _.get(versionUrls, ['shasum', 'txt']);
-    //var signatureUrl = _.get(versionUrls, ['shasum', 'txt.asc']);
     return Promise.all([
-        processUrl({url: sourceUrl, version: version, distribution: 'source'}),
-        //  processUrl({url: binariesUrl, version: version, distribution: 'binaries'}),
-        // processUrl({url: shasumUrl, version: version, distribution: 'checksum'}),
-        // processUrl({url: signatureUrl, version: version, distribution: 'signature'})
+        processUrl({url: sourceUrl, version: version, distribution: 'source'})
     ])
 })
     .then(function () {

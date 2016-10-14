@@ -19,7 +19,7 @@ var versions = ['7.1.0RC3', '7.0.11', '5.6.26'];
 var availableVersions = _.keys(urls);
 versions = _.intersection(versions, availableVersions);
 
-var promise = Promise.each(versions, function (version) {
+var promise = Promise.map(versions, function (version) {
 
     if (versions.indexOf(version) === -1) {
         return;

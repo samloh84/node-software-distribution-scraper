@@ -7,102 +7,93 @@ const _ = require('lodash');
 const sprintf = require('sprintf-js').sprintf;
 const YAML = require('yamljs');
 const Promise = require('bluebird');
+const nunjucks = require('nunjucks');
+const FileUtil = require('@lohsy84/common-utils').FileUtil;
 
-
-var language = /(\w+)-postprocess/.exec(_path.basename(__filename, '.js'))[1];
+var language = /(\w+)-generate-dockerfiles/.exec(_path.basename(__filename, '.js'))[1];
 var workingDir = _path.resolve(process.cwd(), 'output', language);
-var urls = require(_path.resolve(workingDir, sprintf('%s.json', language)));
+var templateDir = _path.resolve(process.cwd(), 'templates');
+var urls = require(_path.resolve(workingDir, sprintf('%s-vars.json', language))).urls;
 
+var versions = _.keys(urls);
 
-var output = {urls: {}};
+var additionalVersionTags = {
+    "6.7.0": ["latest"]
+};
 
-var versions = ['6.7.0', '5.12.0', '4.6.0', '0.12.16', '0.10.47'];
+var from = "centos:latest";
+var maintainer = require(_path.resolve(process.cwd(), 'package.json')).author;
+var username = _.get(process.env, 'DOCKER_USERNAME', 'samloh84');
+var registry = _.get(process.env, 'DOCKER_REGISTRY', username);
 
+var promise = Promise.map(_.toPairs(urls), function (versionPair) {
+    var version = versionPair[0];
+    var versionData = versionPair[1];
 
-var availableVersions = _.keys(urls);
-versions = _.intersection(versions, availableVersions);
+    var tags = [];
 
-var promise = Promise.each(versions, function (version) {
-
-    if (versions.indexOf(version) === -1) {
-        return;
+    var versionComponents = version.split('.');
+    var i;
+    var existingTags = [];
+    for (i = 1; i < versionComponents.length; i++) {
+        var tag = versionComponents.slice(0, i).join('.');
+        if (tag !== '0' && existingTags.indexOf(tag) == -1) {
+            tags.push(tag);
+            existingTags.push(tag);
+        }
     }
 
-    var versionUrls = _.get(urls, version);
+    tags = _.concat(tags, _.get(additionalVersionTags, version, []));
 
-    var sourceUrl = _.get(versionUrls, ['source', 'tar.gz']);
-    var binariesUrl = _.get(versionUrls, ['linux-x64', 'tar.gz']);
-    var shasumUrl = _.get(versionUrls, ['shasum', 'txt']);
-    var signatureUrl = _.get(versionUrls, ['shasum', 'txt.asc']);
+    var templateData = _.merge({}, versionData, {
+        from: from,
+        maintainer: maintainer,
+        version: version,
+        tags: tags,
+        name: language,
+        registry: registry,
+        username: username
+
+    });
+
+
+    var customDockerfileTemplatePath = _path.resolve(templateDir, language, sprintf('Dockerfile-%s.njk', version));
+    var dockerfileTemplatePath = _path.resolve(templateDir, language, 'Dockerfile.njk');
+    var dockerfilePromise = FileUtil.exists({path: customDockerfileTemplatePath})
+        .then(function (exists) {
+            var dockerfileContents = nunjucks.render((exists ? customDockerfileTemplatePath : dockerfileTemplatePath), templateData);
+
+            return ScrapeUtil.writeFile({
+                path: _path.resolve(workingDir, 'Dockerfiles', version, 'Dockerfile'),
+                data: dockerfileContents
+            })
+        });
+
+    var makefileTemplatePath = _path.resolve(templateDir, 'Makefile.njk');
+
+    var makefilePromise = Promise.resolve(nunjucks.render(makefileTemplatePath, templateData))
+        .then(function (makefileContents) {
+            ScrapeUtil.writeFile({
+                path: _path.resolve(workingDir, 'Dockerfiles', version, 'Makefile'),
+                data: makefileContents
+            })
+        });
+
+
     return Promise.all([
-        processUrl({url: sourceUrl, version: version, distribution: 'source'}),
-        processUrl({url: binariesUrl, version: version, distribution: 'binaries'}),
-        processUrl({url: shasumUrl, version: version, distribution: 'checksum'}),
-        processUrl({url: signatureUrl, version: version, distribution: 'signature'})
+        dockerfilePromise,
+        makefilePromise
     ])
 })
     .then(function () {
-        return Promise.all([
-            ScrapeUtil.writeFile({
-                path: _path.resolve(workingDir, sprintf('%s-vars.json', language)),
-                data: JSON.stringify(output, null, 4)
-            }),
-            ScrapeUtil.writeFile({
-                path: _path.resolve(workingDir, sprintf('%s-vars.yml', language)),
-                data: YAML.stringify(output, 12)
-            })
-        ]);
+        var templateData = _.merge({}, {versions: versions});
+        var parentMakefileTemplatePath = _path.resolve(templateDir, 'ParentMakefile.njk');
+        var parentMakefileContents = nunjucks.render(parentMakefileTemplatePath, templateData);
+        return ScrapeUtil.writeFile({
+            path: _path.resolve(workingDir, 'Dockerfiles', 'Makefile'),
+            data: parentMakefileContents
+        })
     });
 
 
 return CliUtil.execute(promise);
-
-function processUrl(options) {
-    var url = _.get(options, 'url');
-    var distribution = _.get(options, 'distribution');
-    var version = _.get(options, 'version');
-
-
-    var fileName = _path.basename(_.get(_url.parse(url), 'pathname'));
-    var filePath = _path.resolve(workingDir, 'downloads', version, fileName);
-
-    return ScrapeUtil.download({savePath: filePath, url: url})
-        .then(function () {
-            var dirPromise = null;
-
-            if (/(\.tar\.gz|\.tgz)$/.test(fileName)) {
-                dirPromise = ScrapeUtil.listTarballEntries(filePath)
-                    .then(function (entries) {
-                        return _.get(_.first(entries), 'path');
-                    })
-                    .catch(function () {
-                        return null;
-                    });
-            } else if (/\.zip$/.test(fileName)) {
-                dirPromise = ScrapeUtil.listZipEntries(filePath)
-                    .then(function (entries) {
-                        return _.get(_.first(entries), 'entryName');
-                    })
-                    .catch(function () {
-                        return null;
-                    });
-            }
-
-            return Promise.props({
-                hash: ScrapeUtil.hashFile(filePath),
-                dir: dirPromise
-            });
-        })
-        .then(function (props) {
-            var dir = undefined;
-            if (!_.isNil(props.dir)) {
-                dir = props.dir.replace(/\/$/, '');
-            }
-            var hash = undefined;
-            if (!_.isNil(props.hash)) {
-                hash = props.hash.toUpperCase()
-            }
-
-            _.set(output, ['urls', version, distribution], {file: fileName, dir: dir, url: url, hash: hash});
-        });
-}

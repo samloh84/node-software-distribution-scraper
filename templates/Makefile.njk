@@ -1,0 +1,34 @@
+REGISTRY={{ registry }}
+USERNAME={{ username }}
+NAME={{ name }}
+VERSION={{ version }}
+TAGS={{ tags | join(" ")}}
+
+.PHONY: build clean tag bash exec push
+
+default: build
+
+build: Dockerfile
+	docker build --force-rm -t $(USERNAME)/$(NAME):$(VERSION) .
+
+clean:
+	docker rmi -f $(USERNAME)/$(NAME):$(VERSION)
+
+tag: build
+	@for TAG in $(TAGS); do \
+		docker tag $(USERNAME)/$(NAME):$(VERSION) $(USERNAME)/$(NAME):$$TAG; \
+	done
+
+bash: build
+	docker run -ti --rm $(USERNAME)/$(NAME):$(VERSION) bash
+
+exec: build
+	docker exec -ti --rm $(USERNAME)/$(NAME):$(VERSION)
+
+push: build
+	docker tag $(USERNAME)/$(NAME):$(VERSION) $(REGISTRY)/$(NAME):$(VERSION)
+	docker push $(REGISTRY)/$(NAME):$(VERSION);
+	@for TAG in $(TAGS); do \
+		docker tag $(USERNAME)/$(NAME):$(VERSION) $(REGISTRY)/$(NAME):$$TAG; \
+		docker push $(REGISTRY)/$(NAME):$$TAG; \
+	done
