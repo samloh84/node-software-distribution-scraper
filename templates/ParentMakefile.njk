@@ -11,7 +11,6 @@ build: {{ versions | join(" ") }}
 
 all: {{ versions | join(" ")}}
 
-
 clean:
 {%- for version in versions %}
 	$(MAKE) -C {{ version }} clean

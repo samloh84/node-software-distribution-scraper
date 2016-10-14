@@ -9,7 +9,7 @@ const YAML = require('yamljs');
 const Promise = require('bluebird');
 
 
-var language = /(\w+)-postprocess/.exec(_path.basename(__filename, '.js'))[1];
+var language = /([-_a-zA-Z0-9]+)-postprocess/.exec(_path.basename(__filename, '.js'))[1];
 var workingDir = _path.resolve(process.cwd(), 'output', language);
 var urls = require(_path.resolve(workingDir, sprintf('%s.json', language)));
 
@@ -33,15 +33,29 @@ var promise = Promise.map(versions, function (version) {
     var jceVersion = 'jce' + version[0];
 
     var binariesUrl = _.get(versionUrls, ['linux-x64', 'tar.gz']) || _.get(versionUrls, ['linux-x64', 'bin']);
+    var rpmPackageUrl = _.get(versionUrls, ['linux-x64', 'rpm']) || _.get(versionUrls, ['linux-x64-rpm', 'bin']);
 
     var jceUrl = _.get(urls, ['jce', version[0], 'zip']);
+    var additionalAttributes = {jceVersion: jceVersion};
+
+    if (version == '6u45-b06') {
+        _.set(additionalAttributes, 'dir', 'jdk1.6.0_45');
+    }
+
     return Promise.all([
         processUrl({
             url: binariesUrl,
             product: 'jdk',
             version: version,
             distribution: 'binaries',
-            attributes: {jceVersion: jceVersion}
+            attributes: additionalAttributes
+        }),
+        processUrl({
+            url: rpmPackageUrl,
+            product: 'jdk',
+            version: version,
+            distribution: 'rpm',
+            attributes: additionalAttributes
         }),
         processUrl({url: jceUrl, product: 'jce', version: jceVersion, distribution: 'binaries'})
     ])
@@ -136,11 +150,11 @@ function processUrl(options) {
                 hash = props.hash.toUpperCase()
             }
 
-            _.set(output, ['urls', product, version, distribution], _.merge({}, additionalAttributes, {
+            _.set(output, ['urls', product, version, distribution], _.merge({}, {
                 file: fileName,
                 dir: dir,
                 url: url,
                 hash: hash
-            }));
+            }, additionalAttributes));
         });
 }

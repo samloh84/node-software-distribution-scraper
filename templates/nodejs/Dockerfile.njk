@@ -1,5 +1,5 @@
 FROM {{ from }}
-MAINTAINER {{ maintainer }}
+MAINTAINER {{ maintainer | safe }}
 
 RUN yum install -y make gcc-c++
 
