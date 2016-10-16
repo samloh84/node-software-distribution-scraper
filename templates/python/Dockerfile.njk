@@ -1,0 +1,58 @@
+FROM {{ from }}
+MAINTAINER {{ maintainer |safe }}
+
+# Install compiler and library dependencies
+RUN yum install -y \
+zlib-dev \
+openssl-devel \
+sqlite-devel \
+bzip2-devel
+
+# Reference: https://www.digitalocean.com/community/tutorials/how-to-set-up-python-2-7-6-and-3-3-3-on-centos-6-4
+
+# Retrieve GPG keys
+RUN gpg --keyserver pool.sks-keyservers.net --recv-keys \
+	6A45C816 \
+	36580288 \
+	7D9DC8D2 \
+	18ADD4FF \
+	A4135B38 \
+	A74B06BF \
+	EA5BBD71 \
+	ED9D77D5 \
+	E6DF025C \
+	AA65421D \
+	6F5E1540 \
+	F73C700D \
+	487034E5
+
+
+RUN \
+
+# Create temp directory
+mkdir -p /tmp/python{{ pythonMajorVersion }}/{{ source.dir }} \
+&& pushd /tmp/python{{ pythonMajorVersion }}/{{ source.dir }} \
+
+# Download and verify Python source code
+&& curl -Lo {{ source.file }} {{ source.url }} \
+&& curl -Lo {{ signature.file }} {{ signature.url }} \
+&& gpg --verify {{ signature.file }} \
+&& echo " {{ source.hash }}  {{ source.file }}" | sha256sum -c - \
+
+# Extract and compile source
+&& mkdir -p /opt/python{{ pythonMajorVersion }}/{{ source.dir }} \
+&& tar -xzf {{ source.file }} -C /tmp/python{{ pythonMajorVersion }}/{{ source.dir }} \
+&& pushd /tmp/python{{ pythonMajorVersion }}/{{ source.dir }}/{{ source.dir }} \
+&& ./configure --prefix /opt/python{{ pythonMajorVersion }}/{{ source.dir }} \
+&& make \
+&& make install \
+&& popd \
+&& popd \
+&& rm -rf /tmp/python{{ pythonMajorVersion }}
+
+# Set Path environment variable
+ENV PATH $PATH:/opt/python{{ pythonMajorVersion }}/{{ source.dir }}/bin
+
+# Upgrade pip to latest version
+RUN pip install --upgrade pip
+

@@ -1,0 +1,78 @@
+FROM {{ from }}
+MAINTAINER {{ maintainer |safe }}
+
+# Reference: http://www.tecmint.com/install-and-compile-php-7-on-centos-7-and-debian-8/
+
+# Install compiler and library dependencies
+RUN yum install -y \
+libxml2-devel \
+pkgconfig \
+openssl-devel\
+bzip2-devel \
+curl-devel \
+libpng-devel \
+libjpeg-devel \
+libXpm-devel \
+freetype-devel \
+gmp-devel \
+libmcrypt-devel \
+mariadb-devel \
+aspell-devel \
+recode-devel \
+httpd-devel
+
+# Retrieve GPG keys
+RUN gpg --keyserver pool.sks-keyservers.net --recv-keys \
+	1A4E8B7277C42E53DBA9C7B9BCAA30EA9C0D5763 \
+	6E4F6AB321FDC07F2C332E3AC2BF0BC433CFC8B3
+
+# Create temp directory
+RUN mkdir -p /tmp/php/{{ source.dir }} \
+&& pushd /tmp/php/{{ source.dir }} \
+
+# Download and verify PHP source code
+&& curl -Lo {{ source.file }} {{ source.url }} \
+&& curl -Lo {{ signature.file }} {{ signature.url }} \
+&& gpg --verify {{ signature.file }} \
+&& echo "{{ source.hash }}  {{ source.file }}" | sha256sum -c - \
+
+# Extract and compile source
+&& mkdir -p /opt/php/{{ source.dir }} \
+&& tar -xzf {{ source.file }} -C /tmp/php/{{ source.dir }} \
+&& pushd /tmp/php/{{ source.dir }}/{{ source.dir }} \
+&& ./configure \
+    --prefix {{ php_home }}  \
+    --enable-bcmath  \
+    --enable-calendar  \
+    --enable-exif  \
+    --enable-fpm  \
+    --enable-intl  \
+    --enable-mbstring  \
+    --enable-zip  \
+    --with-bz2  \
+    --with-curl  \
+    --with-gd  \
+    --with-imap  \
+    --with-imap-ssl  \
+    --with-kerberos  \
+    --with-ldap  \
+    --with-libdir=lib64  \
+    --with-mcrypt  \
+    --with-mysqli  \
+    --with-openssl  \
+    --with-pdo-mysql  \
+    --with-pdo-pgsql  \
+    --with-pear  \
+    --with-pgsql  \
+    --with-zlib  \
+&& make \
+&& make install \
+&& popd \
+&& popd \
+&& rm -rf /tmp/php
+
+# Set Path environment variable
+ENV PATH $PATH:/opt/php/{{ source.dir }}/bin
+
+# Upgrade pear to latest version
+RUN pear upgrade

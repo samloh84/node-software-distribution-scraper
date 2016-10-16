@@ -27,9 +27,11 @@ var promise = Promise.map(versions, function (version) {
 
     var versionUrls = _.get(urls, version);
 
-    var sourceUrl = _.get(versionUrls, ['source', 'tgz']);
+    var sourceUrl = _.get(versionUrls, ['source', 'tgz', 'url']);
+    var signatureUrl = _.get(versionUrls, ['source', 'tgz', 'signatureUrl']);
     return Promise.all([
-        processUrl({url: sourceUrl, version: version, distribution: 'source'})
+        processUrl({url: sourceUrl, version: version, distribution: 'source'}),
+        processUrl({url: signatureUrl, version: version, distribution: 'signature'})
     ])
 })
     .then(function () {

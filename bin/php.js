@@ -9,10 +9,18 @@ var language = _path.basename(__filename, '.js');
 var workingDirectory = _path.resolve(process.cwd(), 'output', language);
 
 
-var startingUrls = ['http://php.net/releases/', 'https://secure.php.net/downloads.php', 'https://downloads.php.net/~davey/', 'http://museum.php.net/', 'http://windows.php.net/downloads/', 'http://windows.php.net/download'];
+var startingUrls = ['http://php.net/releases/',
+    'https://secure.php.net/downloads.php',
+    'https://downloads.php.net/~davey/',
+    // 'http://museum.php.net/',
+    // 'http://windows.php.net/downloads/',
+    // 'http://windows.php.net/download'
+];
 
 var parseCallback = function (link) {
-    return (/^https?:\/\/\w+.php.net\/.*\/$/.test(link) || /^https?:\/\/\w+.php.net\/.*\/from\/a\/mirror$/.test(link)) && !/manual\//.test(link);
+    return (/^https?:\/\/secure.php.net\/.*\/$/.test(link)
+            || /^https?:\/\/secure.php.net\/.*\/from\/a\/mirror$/.test(link)
+        ) && !/manual\//.test(link);
 };
 
 
@@ -24,6 +32,16 @@ var filePattern1Callback = function (matches) {
 
     return {version: version, extension: extension};
 };
+
+var signaturePattern1 = /^https?:\/\/php\.net\/get\/php-(\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(tar\.bz2|tar\.gz|tar\.xz).asc)\/from\/this\/mirror$/;
+var signaturePattern1Callback = function (matches) {
+    var version = matches[1];
+    //var distribution = matches[2];
+    var extension = matches[2];
+
+    return {version: version, extension: extension, signature: true};
+};
+
 
 var filePattern2 = /^https?:\/\/museum\.php\.net\/(?:php\d+|win32)\/php-(\d+(?:\.\d+)?\.\d+[a-zA-Z0-9]*)(?:-([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*))?(?:\.(tar\.bz2|tar\.gz|tar\.xz|zip|exe|msi))$/;
 
@@ -47,10 +65,10 @@ var signaturePattern2Callback = function (matches) {
     var extension = matches[3];
 
     if (_.isEmpty(distribution)) {
-        distribution = 'signature';
+        distribution = 'source';
     }
 
-    return {version: version, distribution: distribution, extension: extension};
+    return {version: version, distribution: distribution, extension: extension, signature: true};
 };
 
 var filePattern3 = /^https?:\/\/downloads.php.net\/~davey\/php-(\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(tar\.bz2|tar\.gz|tar\.xz))$/;
@@ -67,18 +85,15 @@ var signaturePattern3 = /^https?:\/\/downloads.php.net\/~davey\/php-(\d+\.\d+\.\
 
 var signaturePattern3Callback = function (matches) {
     var version = matches[1];
-    var distribution = matches[2];
-    var extension = matches[3];
+    var distribution = 'source';
+    var extension = matches[2];
 
-    if (_.isEmpty(distribution)) {
-        distribution = 'signature';
-    }
-
-    return {version: version, distribution: distribution, extension: extension};
+    return {version: version, distribution: distribution, extension: extension, signature: true};
 };
 
 var patterns = [
     {pattern: filePattern1, callback: filePattern1Callback},
+    {pattern: signaturePattern1, callback: signaturePattern1Callback},
     {pattern: filePattern2, callback: filePattern2Callback},
     {pattern: signaturePattern2, callback: signaturePattern2Callback},
     {pattern: filePattern3, callback: filePattern3Callback},
@@ -95,6 +110,20 @@ var promise = ScrapeUtil.crawl({
     .then(function (links) {
         var urls = {};
         var unmatchedLinks = [];
+        var signatureLinks = [];
+        _.each(links, function (link) {
+            var regex = /^https?:\/\/php\.net\/get\/(php-(?:\d+\.\d+\.\d+[a-zA-Z0-9]*)(?:\.(?:tar\.bz2|tar\.gz|tar\.xz)))\/from\/this\/mirror$/;
+            var matches = regex.exec(link);
+            if (!_.isNil(matches)) {
+                var filename = matches[1];
+                var offset = link.indexOf(filename);
+                link = link.slice(0, offset) + filename + '.asc' + link.slice(offset + filename.length);
+
+                signatureLinks.push(link);
+            }
+        });
+
+        links = _.concat(links, signatureLinks);
 
         _.each(links, function (link) {
             var unmatched = true;
@@ -114,6 +143,7 @@ var promise = ScrapeUtil.crawl({
                 var version = linkInfo.version;
                 var distribution = linkInfo.distribution;
                 var extension = linkInfo.extension;
+                var signature = linkInfo.signature;
 
                 if (_.isEmpty(distribution)) {
                     if (extension === 'pkg') {
@@ -122,7 +152,16 @@ var promise = ScrapeUtil.crawl({
                         distribution = 'source';
                     }
                 }
-                _.set(urls, [version, distribution, extension], link);
+
+                var path = [version, distribution, extension];
+
+                if (signature) {
+                    path.push('signatureUrl');
+                } else {
+                    path.push('url');
+                }
+
+                _.set(urls, path, link);
             });
 
             if (unmatched) {

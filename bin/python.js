@@ -25,10 +25,10 @@ var filePatternCallback = function (matches) {
 };
 var signaturePatternCallback = function (matches) {
     var version = matches[1];
-    var distribution = 'signature';
-    var extension = matches[2];
+    var distribution = matches[2];
+    var extension = matches[3];
 
-    return {version: version, distribution: distribution, extension: extension};
+    return {version: version, distribution: distribution, extension: extension, signature: true};
 };
 var patterns = [
     {pattern: filePattern, callback: filePatternCallback},
@@ -63,6 +63,7 @@ var promise = ScrapeUtil.crawl({
                 var version = linkInfo.version;
                 var distribution = linkInfo.distribution;
                 var extension = linkInfo.extension;
+                var signature = linkInfo.signature;
 
                 if (_.isEmpty(distribution)) {
                     if (extension === 'pkg') {
@@ -71,7 +72,15 @@ var promise = ScrapeUtil.crawl({
                         distribution = 'source';
                     }
                 }
-                _.set(urls, [version, distribution, extension], link);
+                var path = [version, distribution, extension];
+
+                if (signature){
+                    path.push('signatureUrl');
+                }else{
+                    path.push('url');
+                }
+
+                _.set(urls, path, link);
             });
 
             if (unmatched) {
