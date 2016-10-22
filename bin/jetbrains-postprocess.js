@@ -137,5 +137,7 @@ function processUrl(options) {
                 url: url,
                 hash: hash
             }));
+
+            _.set(output, ['urls', product, 'latestVersion'], version);
         });
 }

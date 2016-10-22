@@ -35,7 +35,7 @@ var filePatternCallback = function (matches) {
 //     return {version: version, distribution: distribution, extension: extension};
 // };
 var patterns = [
-    {pattern: filePattern, callback: filePatternCallback},
+    {pattern: filePattern, callback: filePatternCallback}
     // {pattern: shasumsPattern, callback: shasumsPatternCallback}
 ];
 
