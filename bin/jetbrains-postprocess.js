@@ -131,6 +131,8 @@ function processUrl(options) {
                 hash = props.hash.toUpperCase()
             }
 
+            product = product.toLowerCase();
+
             _.set(output, ['urls', product, version, distribution], _.merge({}, additionalAttributes, {
                 file: fileName,
                 dir: dir,
